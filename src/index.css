@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@theme {
+  --color-trip-bg: #0f172a;
+  --color-trip-card: #1e293b;
+  --color-trip-purple: #8b5cf6;
+  --color-trip-purple-light: #a78bfa;
+  --color-trip-purple-dark: #7c3aed;
+}
