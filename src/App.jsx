@@ -6,7 +6,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 function App() {
   const [password, setPassword] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [activeTab, setActiveTab] = useState('itinerary'); // 預設跳到行程表方便預覽
+  const [activeTab, setActiveTab] = useState('itinerary'); 
   const [selectedDay, setSelectedDay] = useState(1);
 
   // ==========================================
@@ -21,8 +21,8 @@ function App() {
   const [expenses, setExpenses] = useState([]);
   const [expenseItem, setExpenseItem] = useState('');
   const [expenseAmount, setExpenseAmount] = useState('');
-  const [expensePayer, setExpensePayer] = useState('Kelly');
-  const [expenseSplit, setExpenseSplit] = useState('shared');
+  const [expensePayer, setExpensePayer] = useState('Kelly'); 
+  const [expenseSplit, setExpenseSplit] = useState('shared'); 
   const [isAddingExpense, setIsAddingExpense] = useState(false); 
 
   // ==========================================
@@ -48,18 +48,15 @@ function App() {
   useEffect(() => {
     if (!isLoggedIn) return;
 
-    // 1. 讀取行程表 (依照 order 排序)
     const qItinerary = query(collection(db, 'itineraries'), orderBy('order', 'asc'));
     const unsubItinerary = onSnapshot(qItinerary, (snapshot) => {
       setItineraries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    // 2. 讀取記帳本
     const unsubExpenses = onSnapshot(collection(db, 'expenses'), (snapshot) => {
       setExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    // 3. 讀取行前清單
     const unsubPacking = onSnapshot(collection(db, 'packingList'), (snapshot) => {
       setPackingList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -165,17 +162,7 @@ function App() {
   };
 
   const handleDeleteItem = async (id) => {
-    // 👇 加入這行判斷，如果按取消就直接結束函數
-    if (!window.confirm('確定要刪除這個項目嗎？')) {
-      return;
-    }
-
-    try { 
-      await deleteDoc(doc(db, 'packingList', id)); 
-    } catch (error) { 
-      console.error(error); 
-      alert("刪除失敗");
-    }
+    await deleteDoc(doc(db, 'packingList', id));
   };
 
   // ------------------------------------------
@@ -275,7 +262,7 @@ function App() {
           <button onClick={handleLogout} className="text-xs bg-trip-card border border-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-800 transition">鎖定</button>
         </div>
 
-        <div className="flex-1 p-4">
+        <div className="flex-1 p-4 max-w-full overflow-x-hidden">
           
           {activeTab === 'itinerary' && (
             <div className="animate-fade-in space-y-6">
@@ -300,24 +287,31 @@ function App() {
                   <span>+</span> 新增行程
                 </button>
               ) : (
-                <form onSubmit={handleAddItinerary} className="bg-trip-card p-5 rounded-2xl border border-trip-purple shadow-lg space-y-4">
+                <form onSubmit={handleAddItinerary} className="bg-trip-card p-4 sm:p-5 rounded-2xl border border-trip-purple shadow-lg space-y-4 max-w-full overflow-hidden">
                   <h3 className="font-bold text-trip-purple-light mb-2">新增 Day {selectedDay} 的行程</h3>
                   
-                  {/* 修正 1：版面調整 (使用 flex-col 搭配 sm:flex-row，確保手機直排、電腦並排) */}
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex-1">
+                  {/* 優化 1：修正手機版超框問題，並在結束時間加上「清除」按鈕 */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col w-full">
                       <label className="block text-xs text-gray-400 mb-1">開始時間</label>
-                      <input type="time" value={newItineraryStartTime} onChange={(e) => setNewItineraryStartTime(e.target.value)} className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none" required />
+                      <input type="time" value={newItineraryStartTime} onChange={(e) => setNewItineraryStartTime(e.target.value)} className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none text-sm" required />
                     </div>
-                    <div className="flex-1">
-                      <label className="block text-xs text-gray-400 mb-1">結束時間 (選填)</label>
-                      <input type="time" value={newItineraryEndTime} onChange={(e) => setNewItineraryEndTime(e.target.value)} className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none" />
+                    <div className="flex flex-col w-full">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-xs text-gray-400">結束時間 (選填)</label>
+                        {newItineraryEndTime && (
+                          <button type="button" onClick={() => setNewItineraryEndTime('')} className="text-[10px] text-red-400 hover:text-red-300 font-bold bg-gray-800 px-1.5 py-0.5 rounded">
+                            清除
+                          </button>
+                        )}
+                      </div>
+                      <input type="time" value={newItineraryEndTime} onChange={(e) => setNewItineraryEndTime(e.target.value)} className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none text-sm" />
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-xs text-gray-400 mb-1">圖示種類</label>
-                    <select value={newItineraryType} onChange={(e) => setNewItineraryType(e.target.value)} className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none">
+                    <select value={newItineraryType} onChange={(e) => setNewItineraryType(e.target.value)} className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none text-sm">
                       <option value="📍">📍 景點</option>
                       <option value="🥩">🥩 美食</option>
                       <option value="🚗">🚗 交通</option>
@@ -328,23 +322,22 @@ function App() {
                   </div>
                   <div>
                     <label className="block text-xs text-gray-400 mb-1">行程標題</label>
-                    <input type="text" value={newItineraryTitle} onChange={(e) => setNewItineraryTitle(e.target.value)} placeholder="例如：川平灣" className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none" required />
+                    <input type="text" value={newItineraryTitle} onChange={(e) => setNewItineraryTitle(e.target.value)} placeholder="例如：川平灣" className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none text-sm" required />
                   </div>
                   
-                  {/* 修正 2：將備註改為 textarea，按下 Enter 即為換行 */}
                   <div>
                     <label className="block text-xs text-gray-400 mb-1">備註 (支援多行)</label>
                     <textarea 
                       value={newItineraryMemo} 
                       onChange={(e) => setNewItineraryMemo(e.target.value)} 
                       placeholder="例如：玻璃船一人約 ¥1,000" 
-                      className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none min-h-[80px] resize-y" 
+                      className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none min-h-[80px] resize-y text-sm" 
                     />
                   </div>
 
                   <div className="flex gap-2 pt-2">
-                    <button type="submit" className="flex-1 bg-trip-purple hover:bg-trip-purple-dark text-white font-bold py-2 rounded-lg transition">確認新增</button>
-                    <button type="button" onClick={() => setIsAddingItinerary(false)} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg transition">取消</button>
+                    <button type="submit" className="flex-1 bg-trip-purple hover:bg-trip-purple-dark text-white font-bold py-2 rounded-lg transition text-sm">確認新增</button>
+                    <button type="button" onClick={() => setIsAddingItinerary(false)} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg transition text-sm">取消</button>
                   </div>
                 </form>
               )}
@@ -370,16 +363,23 @@ function App() {
                                 className={`transition-shadow ${snapshot.isDragging ? 'shadow-2xl opacity-90' : ''}`}
                               >
                                 {editingItiId === item.id ? (
-                                  <form onSubmit={handleUpdateItinerary} className="bg-trip-card p-4 rounded-xl border border-trip-purple shadow-lg space-y-3">
-                                    {/* 修正 3：編輯狀態的時間版面也調整成彈性佈局 */}
-                                    <div className="flex flex-col sm:flex-row gap-2">
-                                      <div className="flex-1 flex items-center gap-2">
-                                        <span className="text-xs text-gray-500 whitespace-nowrap">開始</span>
+                                  <form onSubmit={handleUpdateItinerary} className="bg-trip-card p-4 rounded-xl border border-trip-purple shadow-lg space-y-3 max-w-full overflow-hidden">
+                                    {/* 優化 2：修正編輯狀態下的時間手機排版，並加上清除按鈕 */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                      <div className="w-full flex items-center gap-2">
+                                        <span className="text-xs text-gray-500 whitespace-nowrap min-w-[28px]">開始</span>
                                         <input type="time" value={editItiStartTime} onChange={(e) => setEditItiStartTime(e.target.value)} className="w-full bg-trip-bg text-white px-2 py-1 text-sm rounded border border-gray-700 focus:border-trip-purple outline-none" required />
                                       </div>
-                                      <div className="flex-1 flex items-center gap-2">
-                                        <span className="text-xs text-gray-500 whitespace-nowrap">結束</span>
-                                        <input type="time" value={editItiEndTime} onChange={(e) => setEditItiEndTime(e.target.value)} className="w-full bg-trip-bg text-white px-2 py-1 text-sm rounded border border-gray-700 focus:border-trip-purple outline-none" />
+                                      <div className="w-full flex items-center gap-2 relative">
+                                        <span className="text-xs text-gray-500 whitespace-nowrap min-w-[28px]">結束</span>
+                                        <div className="flex-1 flex items-center relative w-full">
+                                          <input type="time" value={editItiEndTime} onChange={(e) => setEditItiEndTime(e.target.value)} className="w-full bg-trip-bg text-white px-2 py-1 text-sm rounded border border-gray-700 focus:border-trip-purple outline-none pr-10" />
+                                          {editItiEndTime && (
+                                            <button type="button" onClick={() => setEditItiEndTime('')} className="absolute right-1 text-[10px] text-red-400 bg-gray-800 px-1 py-0.5 rounded">
+                                              清除
+                                            </button>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
 
@@ -395,7 +395,6 @@ function App() {
                                       <input type="text" value={editItiTitle} onChange={(e) => setEditItiTitle(e.target.value)} className="col-span-2 bg-trip-bg text-white px-2 py-1 text-sm rounded border border-gray-700 focus:border-trip-purple outline-none" required />
                                     </div>
                                     
-                                    {/* 修正 4：編輯狀態的備註也改用 textarea */}
                                     <textarea 
                                       value={editItiMemo} 
                                       onChange={(e) => setEditItiMemo(e.target.value)} 
@@ -410,7 +409,6 @@ function App() {
                                   </form>
                                 ) : (
                                   <div className="bg-trip-card rounded-xl p-4 border border-gray-800 shadow-sm flex gap-4 items-start relative">
-                                    {/* 拖曳把手 */}
                                     <div 
                                       {...provided.dragHandleProps} 
                                       className="absolute left-0 top-1/2 -translate-y-1/2 p-2 text-gray-600 hover:text-gray-400 cursor-grab active:cursor-grabbing"
@@ -432,7 +430,7 @@ function App() {
                                       )}
                                       <span className="text-2xl mt-1">{item.type}</span>
                                     </div>
-                                    <div className="flex-1 pt-0.5 pr-14">
+                                    <div className="flex-1 pt-0.5 pr-14 min-w-0 break-words">
                                       <h3 className="text-white font-bold text-base mb-1">{item.title}</h3>
                                       <p className="text-gray-400 text-xs whitespace-pre-line">{item.memo}</p>
                                     </div>
