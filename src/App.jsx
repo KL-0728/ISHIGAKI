@@ -165,7 +165,17 @@ function App() {
   };
 
   const handleDeleteItem = async (id) => {
-    await deleteDoc(doc(db, 'packingList', id));
+    // 👇 加入這行判斷，如果按取消就直接結束函數
+    if (!window.confirm('確定要刪除這個項目嗎？')) {
+      return;
+    }
+
+    try { 
+      await deleteDoc(doc(db, 'packingList', id)); 
+    } catch (error) { 
+      console.error(error); 
+      alert("刪除失敗");
+    }
   };
 
   // ------------------------------------------
