@@ -30,8 +30,8 @@ function App() {
   // ==========================================
   const [itineraries, setItineraries] = useState([]);
   const [isAddingItinerary, setIsAddingItinerary] = useState(false);
-  const [newItineraryStartTime, setNewItineraryStartTime] = useState(''); 
-  const [newItineraryEndTime, setNewItineraryEndTime] = useState('');     
+  const [newItineraryStartTime, setNewItineraryStartTime] = useState('');
+  const [newItineraryEndTime, setNewItineraryEndTime] = useState('');
   const [newItineraryTitle, setNewItineraryTitle] = useState('');
   const [newItineraryType, setNewItineraryType] = useState('📍');
   const [newItineraryMemo, setNewItineraryMemo] = useState('');
@@ -43,20 +43,36 @@ function App() {
   const [editItiType, setEditItiType] = useState('📍');
   const [editItiMemo, setEditItiMemo] = useState('');
 
-  // ==========================================
-  // 🆕 Firebase 資料：快速票夾 (純網址超連結版)
-  // ==========================================
-  const [tickets, setTickets] = useState([]);
-  const [expandedCategory, setExpandedCategory] = useState(null); 
-  const [newTicketTitle, setNewTicketTitle] = useState('');
-  const [newTicketMemo, setNewTicketMemo] = useState('');
-  const [newTicketLink, setNewTicketLink] = useState(''); 
-
   const dayDates = { 1: '7/18 (六)', 2: '7/19 (日)', 3: '7/20 (一)', 4: '7/21 (二)' };
 
-  // 處理拖曳放開後的邏輯
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const qItinerary = query(collection(db, 'itineraries'), orderBy('order', 'asc'));
+    const unsubItinerary = onSnapshot(qItinerary, (snapshot) => {
+      setItineraries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    const unsubExpenses = onSnapshot(collection(db, 'expenses'), (snapshot) => {
+      setExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    const unsubPacking = onSnapshot(collection(db, 'packingList'), (snapshot) => {
+      setPackingList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => {
+      unsubItinerary();
+      unsubExpenses();
+      unsubPacking();
+    };
+  }, [isLoggedIn]);
+
+  // ------------------------------------------
+  // 行程表功能 (包含拖曳邏輯)
+  // ------------------------------------------
   const handleDragEnd = (result) => {
-    if (!result.destination) return;
+    if (!result.destination) return; 
 
     const currentDayItems = itineraries.filter(item => item.day === selectedDay);
     const otherDayItems = itineraries.filter(item => item.day !== selectedDay);
@@ -68,90 +84,38 @@ function App() {
     setItineraries([...otherDayItems, ...items]);
 
     items.forEach((item, index) => {
-      const docRef = doc(db, 'itinerary', item.id);
+      const docRef = doc(db, 'itineraries', item.id);
       updateDoc(docRef, { order: index });
     });
   };
 
-  useEffect(() => {
-    if (isLoggedIn) {
-      const unsubPacking = onSnapshot(collection(db, 'packingList'), (snapshot) => {
-        const listData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        listData.sort((a, b) => a.createdAt - b.createdAt);
-        setPackingList(listData);
-      });
-
-      const unsubExpenses = onSnapshot(collection(db, 'expenses'), (snapshot) => {
-        const expData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        expData.sort((a, b) => b.createdAt - a.createdAt);
-        setExpenses(expData);
-      });
-
-      const qItinerary = query(collection(db, 'itinerary'), orderBy('order', 'asc'));
-      const unsubItinerary = onSnapshot(qItinerary, (snapshot) => {
-        setItineraries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      });
-
-      const unsubTickets = onSnapshot(collection(db, 'tickets'), (snapshot) => {
-        const ticketData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        ticketData.sort((a, b) => b.createdAt - a.createdAt);
-        setTickets(ticketData);
-      });
-
-      return () => { unsubPacking(); unsubExpenses(); unsubItinerary(); unsubTickets(); };
-    }
-  }, [isLoggedIn]);
-
-  // ------------------------------------------
-  // 行前清單功能
-  // ------------------------------------------
-  const handleAddItem = async (e) => {
-    e.preventDefault();
-    if (!newItemText.trim()) return;
-    try {
-      await addDoc(collection(db, 'packingList'), { item: newItemText, checked: false, createdAt: new Date().getTime() });
-      setNewItemText('');
-    } catch (error) { alert("新增失敗"); }
-  };
-  const handleToggleItem = async (id, currentStatus) => {
-    try { await updateDoc(doc(db, 'packingList', id), { checked: !currentStatus }); } catch (error) { console.error(error); }
-  };
-  const handleDeleteItem = async (id) => {
-    if(window.confirm('確定要刪除這個準備項目嗎？')) {
-      try { await deleteDoc(doc(db, 'packingList', id)); } catch (error) { console.error(error); }
-    }
-  };
-
-  // ------------------------------------------
-  // 行程表功能
-  // ------------------------------------------
   const handleAddItinerary = async (e) => {
     e.preventDefault();
-    if (!newItineraryStartTime || !newItineraryTitle.trim()) return;
-    try {
-      const currentDayCount = itineraries.filter(item => item.day === selectedDay).length;
-      await addDoc(collection(db, 'itinerary'), {
-        day: selectedDay,
-        startTime: newItineraryStartTime,
-        endTime: newItineraryEndTime, 
-        title: newItineraryTitle,
-        type: newItineraryType,
-        memo: newItineraryMemo,
-        createdAt: new Date().getTime(),
-        order: currentDayCount
-      });
-      setNewItineraryStartTime('');
-      setNewItineraryEndTime('');
-      setNewItineraryTitle('');
-      setNewItineraryType('📍');
-      setNewItineraryMemo('');
-      setIsAddingItinerary(false);
-    } catch (error) { alert("新增行程失敗！"); }
+    if (!newItineraryTitle || !newItineraryStartTime) return;
+    
+    const currentDayCount = itineraries.filter(item => item.day === selectedDay).length;
+
+    await addDoc(collection(db, 'itineraries'), {
+      day: selectedDay,
+      title: newItineraryTitle,
+      startTime: newItineraryStartTime,
+      endTime: newItineraryEndTime,
+      type: newItineraryType,
+      memo: newItineraryMemo,
+      order: currentDayCount, 
+    });
+
+    setNewItineraryTitle('');
+    setNewItineraryStartTime('');
+    setNewItineraryEndTime('');
+    setNewItineraryMemo('');
+    setNewItineraryType('📍');
+    setIsAddingItinerary(false);
   };
 
   const handleDeleteItinerary = async (id) => {
     if(window.confirm('確定要刪除這個行程嗎？')) {
-      try { await deleteDoc(doc(db, 'itinerary', id)); } catch (error) { console.error(error); }
+      await deleteDoc(doc(db, 'itineraries', id));
     }
   };
 
@@ -167,52 +131,38 @@ function App() {
   const handleUpdateItinerary = async (e) => {
     e.preventDefault();
     try {
-      await updateDoc(doc(db, 'itinerary', editingItiId), {
+      await updateDoc(doc(db, 'itineraries', editingItiId), {
         startTime: editItiStartTime,
         endTime: editItiEndTime,
         title: editItiTitle,
         type: editItiType,
         memo: editItiMemo
       });
-      setEditingItiId(null);
+      setEditingItiId(null); 
     } catch (error) {
       alert("修改行程失敗！");
     }
   };
 
   // ------------------------------------------
-  // 🆕 快速票夾：純網址版上傳與刪除邏輯
+  // 行前清單功能
   // ------------------------------------------
-  const handleAddTicket = async (category, e) => {
+  const handleAddItem = async (e) => {
     e.preventDefault();
-    if (!newTicketTitle.trim()) return;
-
-    try {
-      await addDoc(collection(db, 'tickets'), {
-        category: category,
-        title: newTicketTitle,
-        memo: newTicketMemo,
-        link: newTicketLink,
-        createdAt: new Date().getTime()
-      });
-
-      setNewTicketTitle('');
-      setNewTicketMemo('');
-      setNewTicketLink('');
-    } catch (error) {
-      console.error(error);
-      alert("票券儲存失敗，請檢查網路連線！");
-    }
+    if (!newItemText.trim()) return;
+    await addDoc(collection(db, 'packingList'), {
+      item: newItemText,
+      checked: false
+    });
+    setNewItemText('');
   };
 
-  const handleDeleteTicket = async (id) => {
-    if (window.confirm('確定要刪除這張票券連結嗎？')) {
-      try {
-        await deleteDoc(doc(db, 'tickets', id));
-      } catch (error) {
-        console.error(error);
-      }
-    }
+  const handleToggleItem = async (id, currentStatus) => {
+    await updateDoc(doc(db, 'packingList', id), { checked: !currentStatus });
+  };
+
+  const handleDeleteItem = async (id) => {
+    await deleteDoc(doc(db, 'packingList', id));
   };
 
   // ------------------------------------------
@@ -221,7 +171,7 @@ function App() {
   const handleAddExpense = async (e) => {
     e.preventDefault();
     if (!expenseItem.trim() || !expenseAmount || isNaN(expenseAmount)) {
-      alert('請輸入項目與金額！');
+      alert('請輸入正確的項目名稱與金額數值！');
       return;
     }
     try {
@@ -237,7 +187,7 @@ function App() {
       setExpensePayer('Kelly');
       setExpenseSplit('shared');
       setIsAddingExpense(false);
-    } catch (error) { alert("記帳失敗！"); }
+    } catch (error) { alert("記帳失敗，請檢查網路連線！"); }
   };
 
   const handleDeleteExpense = async (id) => {
@@ -283,7 +233,9 @@ function App() {
     settlementColor = "text-red-400";
   }
 
+  // ------------------------------------------
   // 系統登入功能
+  // ------------------------------------------
   const SECRET_PASSWORD = '2026';
   useEffect(() => {
     if (localStorage.getItem('ishigaki_logged_in') === 'true') setIsLoggedIn(true);
@@ -297,6 +249,11 @@ function App() {
   };
   const handleLogout = () => { setIsLoggedIn(false); localStorage.removeItem('ishigaki_logged_in'); };
 
+  const currentDayItineraries = itineraries.filter(iti => iti.day === selectedDay);
+
+  // ------------------------------------------
+  // 畫面渲染
+  // ------------------------------------------
   if (isLoggedIn) {
     return (
       <div className="min-h-screen bg-trip-bg text-white flex flex-col pb-24 font-sans"> 
@@ -305,11 +262,11 @@ function App() {
           <button onClick={handleLogout} className="text-xs bg-trip-card border border-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-800 transition">鎖定</button>
         </div>
 
-        <div className="flex-1 p-4">
+        <div className="flex-1 p-4 max-w-full overflow-x-hidden">
           
-          {/* 行程表分頁 */}
           {activeTab === 'itinerary' && (
             <div className="animate-fade-in space-y-6">
+              
               <div className="flex justify-between bg-trip-card p-1 rounded-xl border border-gray-800">
                 {[1, 2, 3, 4].map((day) => (
                   <button
@@ -330,23 +287,31 @@ function App() {
                   <span>+</span> 新增行程
                 </button>
               ) : (
-                <form onSubmit={handleAddItinerary} className="bg-trip-card p-5 rounded-2xl border border-trip-purple shadow-lg space-y-4">
+                <form onSubmit={handleAddItinerary} className="bg-trip-card p-4 sm:p-5 rounded-2xl border border-trip-purple shadow-lg space-y-4 max-w-full overflow-hidden">
                   <h3 className="font-bold text-trip-purple-light mb-2">新增 Day {selectedDay} 的行程</h3>
                   
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
+                  {/* 優化 1：修正手機版超框問題，並在結束時間加上「清除」按鈕 */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col w-full">
                       <label className="block text-xs text-gray-400 mb-1">開始時間</label>
-                      <input type="time" value={newItineraryStartTime} onChange={(e) => setNewItineraryStartTime(e.target.value)} className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none" required />
+                      <input type="time" value={newItineraryStartTime} onChange={(e) => setNewItineraryStartTime(e.target.value)} className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none text-sm" required />
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1">結束時間 (選填)</label>
-                      <input type="time" value={newItineraryEndTime} onChange={(e) => setNewItineraryEndTime(e.target.value)} className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none" />
+                    <div className="flex flex-col w-full">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-xs text-gray-400">結束時間 (選填)</label>
+                        {newItineraryEndTime && (
+                          <button type="button" onClick={() => setNewItineraryEndTime('')} className="text-[10px] text-red-400 hover:text-red-300 font-bold bg-gray-800 px-1.5 py-0.5 rounded">
+                            清除
+                          </button>
+                        )}
+                      </div>
+                      <input type="time" value={newItineraryEndTime} onChange={(e) => setNewItineraryEndTime(e.target.value)} className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none text-sm" />
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-xs text-gray-400 mb-1">圖示種類</label>
-                    <select value={newItineraryType} onChange={(e) => setNewItineraryType(e.target.value)} className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none">
+                    <select value={newItineraryType} onChange={(e) => setNewItineraryType(e.target.value)} className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none text-sm">
                       <option value="📍">📍 景點</option>
                       <option value="🥩">🥩 美食</option>
                       <option value="🚗">🚗 交通</option>
@@ -357,95 +322,138 @@ function App() {
                   </div>
                   <div>
                     <label className="block text-xs text-gray-400 mb-1">行程標題</label>
-                    <input type="text" value={newItineraryTitle} onChange={(e) => setNewItineraryTitle(e.target.value)} placeholder="例如：川平灣" className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none" required />
+                    <input type="text" value={newItineraryTitle} onChange={(e) => setNewItineraryTitle(e.target.value)} placeholder="例如：川平灣" className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none text-sm" required />
                   </div>
+                  
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">備註 (選填)</label>
-                    <input type="text" value={newItineraryMemo} onChange={(e) => setNewItineraryMemo(e.target.value)} placeholder="例如：玻璃船一人約 ¥1,000" className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none" />
+                    <label className="block text-xs text-gray-400 mb-1">備註 (支援多行)</label>
+                    <textarea 
+                      value={newItineraryMemo} 
+                      onChange={(e) => setNewItineraryMemo(e.target.value)} 
+                      placeholder="例如：玻璃船一人約 ¥1,000" 
+                      className="w-full bg-trip-bg text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-trip-purple outline-none min-h-[80px] resize-y text-sm" 
+                    />
                   </div>
+
                   <div className="flex gap-2 pt-2">
-                    <button type="submit" className="flex-1 bg-trip-purple hover:bg-trip-purple-dark text-white font-bold py-2 rounded-lg transition">確認新增</button>
-                    <button type="button" onClick={() => setIsAddingItinerary(false)} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg transition">取消</button>
+                    <button type="submit" className="flex-1 bg-trip-purple hover:bg-trip-purple-dark text-white font-bold py-2 rounded-lg transition text-sm">確認新增</button>
+                    <button type="button" onClick={() => setIsAddingItinerary(false)} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg transition text-sm">取消</button>
                   </div>
                 </form>
               )}
 
-              <div className="flex flex-col gap-4">
-                {itineraries.filter(iti => iti.day === selectedDay).length === 0 ? (
-                  <p className="text-gray-500 text-center py-4 text-sm">這天還沒有排行程喔！</p>
-                ) : (
-                  <DragDropContext onDragEnd={handleDragEnd}>
-                    <Droppable droppableId="itinerary-droppable">
-                      {(provided) => (
-                        <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-4">
-                          {itineraries.filter(iti => iti.day === selectedDay).map((item, index) => (
-                            <Draggable key={item.id} draggableId={item.id} index={index}>
-                              {(provided) => (
-                                <div ref={provided.innerRef} {...provided.draggableProps} className="bg-trip-card rounded-xl border border-gray-800 shadow-sm transition-all">
-                                  {editingItiId === item.id ? (
-                                    <form onSubmit={handleUpdateItinerary} className="p-4 space-y-3">
-                                      <div className="grid grid-cols-2 gap-2">
-                                        <input type="time" value={editItiStartTime} onChange={(e) => setEditItiStartTime(e.target.value)} className="bg-trip-bg text-white px-2 py-1 text-sm rounded border border-gray-700 focus:border-trip-purple outline-none" required />
-                                        <input type="time" value={editItiEndTime} onChange={(e) => setEditItiEndTime(e.target.value)} className="bg-trip-bg text-white px-2 py-1 text-sm rounded border border-gray-700 focus:border-trip-purple outline-none" />
+              {/* 拖曳列表區域 */}
+              <DragDropContext onDragEnd={handleDragEnd}>
+                <Droppable droppableId={`droppable-${selectedDay}`}>
+                  {(provided) => (
+                    <div 
+                      {...provided.droppableProps} 
+                      ref={provided.innerRef} 
+                      className="flex flex-col gap-4"
+                    >
+                      {currentDayItineraries.length === 0 ? (
+                        <p className="text-gray-500 text-center py-4 text-sm">這天還沒有排行程喔！</p>
+                      ) : (
+                        currentDayItineraries.map((item, index) => (
+                          <Draggable key={item.id} draggableId={item.id} index={index}>
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                className={`transition-shadow ${snapshot.isDragging ? 'shadow-2xl opacity-90' : ''}`}
+                              >
+                                {editingItiId === item.id ? (
+                                  <form onSubmit={handleUpdateItinerary} className="bg-trip-card p-4 rounded-xl border border-trip-purple shadow-lg space-y-3 max-w-full overflow-hidden">
+                                    {/* 優化 2：修正編輯狀態下的時間手機排版，並加上清除按鈕 */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                      <div className="w-full flex items-center gap-2">
+                                        <span className="text-xs text-gray-500 whitespace-nowrap min-w-[28px]">開始</span>
+                                        <input type="time" value={editItiStartTime} onChange={(e) => setEditItiStartTime(e.target.value)} className="w-full bg-trip-bg text-white px-2 py-1 text-sm rounded border border-gray-700 focus:border-trip-purple outline-none" required />
                                       </div>
-                                      <div className="grid grid-cols-3 gap-2">
-                                        <select value={editItiType} onChange={(e) => setEditItiType(e.target.value)} className="col-span-1 bg-trip-bg text-white px-2 py-1 text-sm rounded border border-gray-700 focus:border-trip-purple outline-none">
-                                          <option value="📍">📍 景點</option>
-                                          <option value="🥩">🥩 美食</option>
-                                          <option value="🚗">🚗 交通</option>
-                                          <option value="✈️">✈️ 航班</option>
-                                          <option value="🛍️">🛍️ 購物</option>
-                                          <option value="🏠">🏠 住宿</option>
-                                        </select>
-                                        <input type="text" value={editItiTitle} onChange={(e) => setEditItiTitle(e.target.value)} className="col-span-2 bg-trip-bg text-white px-2 py-1 text-sm rounded border border-gray-700 focus:border-trip-purple outline-none" required />
-                                      </div>
-                                      <input type="text" value={editItiMemo} onChange={(e) => setEditItiMemo(e.target.value)} className="w-full bg-trip-bg text-white px-2 py-1 text-sm rounded border border-gray-700 focus:border-trip-purple outline-none" placeholder="備註..." />
-                                      <div className="flex gap-2 justify-end text-xs pt-1">
-                                        <button type="submit" className="bg-trip-purple px-3 py-1.5 rounded font-bold hover:bg-trip-purple-dark transition">儲存</button>
-                                        <button type="button" onClick={() => setEditingItiId(null)} className="bg-gray-700 px-3 py-1.5 rounded font-bold hover:bg-gray-600 transition">取消</button>
-                                      </div>
-                                    </form>
-                                  ) : (
-                                    <div className="p-4 flex gap-2 items-start relative">
-                                      <div {...provided.dragHandleProps} className="text-gray-600 p-1 cursor-grab active:cursor-grabbing self-center mr-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-                                      </div>
-                                      
-                                      <div className="flex flex-col items-center min-w-[75px] text-center">
-                                        <span className="text-trip-purple-light font-bold text-base">{item.startTime || item.time}</span>
-                                        {item.endTime && (
-                                          <>
-                                            <span className="text-[10px] text-gray-500 my-0.5">▼</span>
-                                            <span className="text-trip-purple-light font-bold text-base">{item.endTime}</span>
-                                          </>
-                                        )}
-                                        <span className="text-2xl mt-1">{item.type}</span>
-                                      </div>
-                                      <div className="flex-1 pt-0.5 pr-14 pl-2">
-                                        <h3 className="text-white font-bold text-base mb-1">{item.title}</h3>
-                                        <p className="text-gray-400 text-xs whitespace-pre-line">{item.memo}</p>
-                                      </div>
-                                      <div className="absolute top-2 right-3 flex items-center gap-1">
-                                        <button onClick={() => startEditingItinerary(item)} className="text-gray-500 hover:text-trip-purple-light text-base p-1 transition">✏️</button>
-                                        <button onClick={() => handleDeleteItinerary(item.id)} className="text-gray-500 hover:text-red-400 text-xl font-bold p-1 transition">×</button>
+                                      <div className="w-full flex items-center gap-2 relative">
+                                        <span className="text-xs text-gray-500 whitespace-nowrap min-w-[28px]">結束</span>
+                                        <div className="flex-1 flex items-center relative w-full">
+                                          <input type="time" value={editItiEndTime} onChange={(e) => setEditItiEndTime(e.target.value)} className="w-full bg-trip-bg text-white px-2 py-1 text-sm rounded border border-gray-700 focus:border-trip-purple outline-none pr-10" />
+                                          {editItiEndTime && (
+                                            <button type="button" onClick={() => setEditItiEndTime('')} className="absolute right-1 text-[10px] text-red-400 bg-gray-800 px-1 py-0.5 rounded">
+                                              清除
+                                            </button>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
-                                  )}
-                                </div>
-                              )}
-                            </Draggable>
-                          ))}
-                          {provided.placeholder}
-                        </div>
+
+                                    <div className="grid grid-cols-3 gap-2">
+                                      <select value={editItiType} onChange={(e) => setEditItiType(e.target.value)} className="col-span-1 bg-trip-bg text-white px-2 py-1 text-sm rounded border border-gray-700 focus:border-trip-purple outline-none">
+                                        <option value="📍">📍 景點</option>
+                                        <option value="🥩">🥩 美食</option>
+                                        <option value="🚗">🚗 交通</option>
+                                        <option value="✈️">✈️ 航班</option>
+                                        <option value="🛍️">🛍️ 購物</option>
+                                        <option value="🏠">🏠 住宿</option>
+                                      </select>
+                                      <input type="text" value={editItiTitle} onChange={(e) => setEditItiTitle(e.target.value)} className="col-span-2 bg-trip-bg text-white px-2 py-1 text-sm rounded border border-gray-700 focus:border-trip-purple outline-none" required />
+                                    </div>
+                                    
+                                    <textarea 
+                                      value={editItiMemo} 
+                                      onChange={(e) => setEditItiMemo(e.target.value)} 
+                                      className="w-full bg-trip-bg text-white px-2 py-1 text-sm rounded border border-gray-700 focus:border-trip-purple outline-none min-h-[60px] resize-y" 
+                                      placeholder="備註 (支援多行)..." 
+                                    />
+                                    
+                                    <div className="flex gap-2 justify-end text-xs pt-1">
+                                      <button type="submit" className="bg-trip-purple px-3 py-1.5 rounded font-bold hover:bg-trip-purple-dark transition">儲存</button>
+                                      <button type="button" onClick={() => setEditingItiId(null)} className="bg-gray-700 px-3 py-1.5 rounded font-bold hover:bg-gray-600 transition">取消</button>
+                                    </div>
+                                  </form>
+                                ) : (
+                                  <div className="bg-trip-card rounded-xl p-4 border border-gray-800 shadow-sm flex gap-4 items-start relative">
+                                    <div 
+                                      {...provided.dragHandleProps} 
+                                      className="absolute left-0 top-1/2 -translate-y-1/2 p-2 text-gray-600 hover:text-gray-400 cursor-grab active:cursor-grabbing"
+                                    >
+                                      <span className="text-lg">⋮⋮</span>
+                                    </div>
+                                    
+                                    <div className="flex flex-col items-center min-w-[75px] text-center ml-4">
+                                      <span className="text-trip-purple-light font-bold text-base">
+                                        {item.startTime}
+                                      </span>
+                                      {item.endTime && (
+                                        <>
+                                          <span className="text-[10px] text-gray-500 my-0.5">▼</span>
+                                          <span className="text-trip-purple-light font-bold text-base">
+                                            {item.endTime}
+                                         </span>
+                                        </>
+                                      )}
+                                      <span className="text-2xl mt-1">{item.type}</span>
+                                    </div>
+                                    <div className="flex-1 pt-0.5 pr-14 min-w-0 break-words">
+                                      <h3 className="text-white font-bold text-base mb-1">{item.title}</h3>
+                                      <p className="text-gray-400 text-xs whitespace-pre-line">{item.memo}</p>
+                                    </div>
+                                    <div className="absolute top-2 right-3 flex items-center gap-1">
+                                      <button onClick={() => startEditingItinerary(item)} className="text-gray-500 hover:text-trip-purple-light text-base p-1 transition">✏️</button>
+                                      <button onClick={() => handleDeleteItinerary(item.id)} className="text-gray-500 hover:text-red-400 text-xl font-bold p-1 transition">×</button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </Draggable>
+                        ))
                       )}
-                    </Droppable>
-                  </DragDropContext>
-                )}
-              </div>
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
+
             </div>
           )}
           
-          {/* 記帳本分頁 */}
           {activeTab === 'expenses' && (
             <div className="animate-fade-in space-y-6">
               <div className="bg-gradient-to-br from-trip-purple-dark to-trip-purple rounded-2xl p-6 shadow-lg relative overflow-hidden">
@@ -500,7 +508,7 @@ function App() {
                   </div>
 
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">這筆花費算「誰」的？</label>
+                    <label className="block text-xs text-trip-purple-light mb-1">這筆花費算「誰」的？</label>
                     <div className="flex flex-col gap-2 mt-1 bg-trip-bg p-2 rounded-lg border border-gray-800">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input type="radio" value="shared" checked={expenseSplit === 'shared'} onChange={(e) => setExpenseSplit(e.target.value)} className="text-trip-purple focus:ring-trip-purple" />
@@ -553,107 +561,18 @@ function App() {
             </div>
           )}
           
-          {/* 🎫 票夾與行前準備分頁 */}
           {activeTab === 'wallet' && (
             <div className="animate-fade-in space-y-8">
-              
-              {/* 快速票夾手風琴區塊 (純網址版) */}
-              <section className="space-y-4">
-                <h3 className="text-gray-400 text-sm font-bold mb-1 flex items-center gap-2"><span>🎫</span> 快速票夾 (點擊展開分類)</h3>
-                
-                {[
-                  { id: 'transport', name: '✈️ 機票與交通' },
-                  { id: 'activities', name: '🎢 樂園與活動' },
-                  { id: 'hotel', name: '🏨 住宿確認' }
-                ].map(cat => {
-                  const isExpanded = expandedCategory === cat.id;
-                  const catTickets = tickets.filter(t => t.category === cat.id);
-                  
-                  return (
-                    <div key={cat.id} className="bg-trip-card rounded-xl border border-gray-800 overflow-hidden shadow-sm">
-                      <button 
-                        type="button"
-                        onClick={() => setExpandedCategory(isExpanded ? null : cat.id)}
-                        className="w-full px-4 py-4 flex justify-between items-center font-bold hover:bg-gray-800/50 transition-colors text-left"
-                      >
-                        <span className="text-base flex items-center gap-2">
-                          {cat.name} 
-                          <span className="text-xs bg-trip-purple/20 text-trip-purple-light px-2 py-0.5 rounded-full font-medium">
-                            {catTickets.length}
-                          </span>
-                        </span>
-                        <span className="text-gray-500 text-xs transition-transform duration-200">{isExpanded ? '▲' : '▼'}</span>
-                      </button>
-                      
-                      {isExpanded && (
-                        <div className="p-4 bg-gray-950/40 border-t border-gray-800/80 space-y-4">
-                          
-                          {/* 新增連結小表單 */}
-                          <form onSubmit={(e) => handleAddTicket(cat.id, e)} className="bg-trip-bg p-4 rounded-xl border border-gray-800 space-y-3 shadow-inner">
-                            <p className="text-xs font-bold text-trip-purple-light">＋ 新增此分類票券或連結</p>
-                            <input 
-                              type="text" 
-                              placeholder="票券名稱 (例如: 樂桃航空去程機票)" 
-                              value={newTicketTitle} 
-                              onChange={(e) => setNewTicketTitle(e.target.value)} 
-                              className="w-full bg-trip-card px-3 py-2 text-sm rounded-lg border border-gray-700 focus:border-trip-purple outline-none text-white" 
-                              required 
-                            />
-                            <input 
-                              type="text" 
-                              placeholder="備註、說明或序號 (選填)" 
-                              value={newTicketMemo} 
-                              onChange={(e) => setNewTicketMemo(e.target.value)} 
-                              className="w-full bg-trip-card px-3 py-2 text-sm rounded-lg border border-gray-700 focus:border-trip-purple outline-none text-white" 
-                            />
-                            <input 
-                              type="url" 
-                              placeholder="貼上網址 (Google Drive、Klook訂單等)" 
-                              value={newTicketLink} 
-                              onChange={(e) => setNewTicketLink(e.target.value)} 
-                              className="w-full bg-trip-card px-3 py-2 text-sm rounded-lg border border-gray-700 focus:border-trip-purple outline-none text-white" 
-                            />
-                            <button type="submit" className="w-full bg-trip-purple hover:bg-trip-purple-dark text-white text-xs font-bold py-2 rounded-lg transition">
-                              確認儲存
-                            </button>
-                          </form>
-
-                          {/* 連結展示區 */}
-                          <div className="space-y-3">
-                            {catTickets.length === 0 ? (
-                              <p className="text-xs text-gray-500 text-center py-3">此分類尚無儲存的票券資料</p>
-                            ) : (
-                              catTickets.map(ticket => (
-                                <div key={ticket.id} className="bg-trip-bg p-3 rounded-xl border border-gray-800 space-y-2 relative shadow-sm">
-                                  <div className="pr-8">
-                                    <h4 className="font-bold text-sm text-white">{ticket.title}</h4>
-                                    {ticket.memo && <p className="text-xs text-gray-400 mt-1 whitespace-pre-line leading-relaxed">{ticket.memo}</p>}
-                                  </div>
-                                  <button type="button" onClick={() => handleDeleteTicket(ticket.id)} className="absolute top-2 right-2 text-gray-500 hover:text-red-400 text-xl font-bold p-1 transition">×</button>
-                                  
-                                  {/* 有網址的話就會出現跳轉按鈕 */}
-                                  {ticket.link && (
-                                    <a 
-                                      href={ticket.link} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="mt-2 inline-flex items-center gap-1 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white text-xs px-3 py-1.5 rounded transition"
-                                    >
-                                      <span>🔗</span> 開啟票券連結
-                                    </a>
-                                  )}
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+              <section>
+                <h3 className="text-gray-400 text-sm font-bold mb-3 flex items-center gap-2"><span>🎫</span> 快速票夾</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-trip-card border border-gray-800 rounded-xl p-4 flex flex-col items-center justify-center text-center">
+                    <div className="w-12 h-12 bg-gray-800 rounded-lg mb-3 flex items-center justify-center text-2xl">📱</div>
+                    <p className="text-sm font-bold">Visit Japan</p>
+                  </div>
+                </div>
               </section>
 
-              {/* 共同行前準備 */}
               <section>
                 <h3 className="text-gray-400 text-sm font-bold mb-3 flex items-center gap-2"><span>✅</span> 共同行前準備</h3>
                 <form onSubmit={handleAddItem} className="flex gap-2 mb-4">
@@ -682,7 +601,6 @@ function App() {
           )}
         </div>
 
-        {/* 底部功能分頁導覽列 */}
         <div className="fixed bottom-0 left-0 w-full bg-trip-card border-t border-gray-800 flex justify-around py-3 px-2 z-50">
           <button onClick={() => setActiveTab('itinerary')} className={`flex flex-col items-center gap-1 w-full ${activeTab === 'itinerary' ? 'text-trip-purple-light' : 'text-gray-500 hover:text-gray-300'}`}>
             <span className="text-xl">📍</span><span className="text-xs font-bold">行程</span>
