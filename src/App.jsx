@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { db } from './firebase'; // 確保這裡只有 db，沒有 storage
+import { db } from './firebase'; 
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 function App() {
   const [password, setPassword] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [activeTab, setActiveTab] = useState('wallet'); // 測試用，可以直接停在票夾頁面
+  const [activeTab, setActiveTab] = useState('itinerary'); 
   const [selectedDay, setSelectedDay] = useState(1);
 
   // ==========================================
@@ -16,7 +16,7 @@ function App() {
   const [newItemText, setNewItemText] = useState('');
 
   // ==========================================
-  // Firebase 資料：姊妹專屬記帳本
+  // Firebase 資料：專屬記帳本
   // ==========================================
   const [expenses, setExpenses] = useState([]);
   const [expenseItem, setExpenseItem] = useState('');
@@ -43,8 +43,6 @@ function App() {
   const [editItiType, setEditItiType] = useState('📍');
   const [editItiMemo, setEditItiMemo] = useState('');
 
-  const dayDates = { 1: '7/18 (六)', 2: '7/19 (日)', 3: '7/20 (一)', 4: '7/21 (二)' };
-
   // ==========================================
   // 🆕 Firebase 資料：快速票夾 (純網址超連結版)
   // ==========================================
@@ -52,7 +50,9 @@ function App() {
   const [expandedCategory, setExpandedCategory] = useState(null); 
   const [newTicketTitle, setNewTicketTitle] = useState('');
   const [newTicketMemo, setNewTicketMemo] = useState('');
-  const [newTicketLink, setNewTicketLink] = useState(''); // 這裡改成 Link，用來存網址
+  const [newTicketLink, setNewTicketLink] = useState(''); 
+
+  const dayDates = { 1: '7/18 (六)', 2: '7/19 (日)', 3: '7/20 (一)', 4: '7/21 (二)' };
 
   // 處理拖曳放開後的邏輯
   const handleDragEnd = (result) => {
@@ -92,7 +92,6 @@ function App() {
         setItineraries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       });
 
-      // 監聽票券資料
       const unsubTickets = onSnapshot(collection(db, 'tickets'), (snapshot) => {
         const ticketData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         ticketData.sort((a, b) => b.createdAt - a.createdAt);
@@ -189,7 +188,6 @@ function App() {
     if (!newTicketTitle.trim()) return;
 
     try {
-      // 只要存文字跟連結就好，非常安全快速
       await addDoc(collection(db, 'tickets'), {
         category: category,
         title: newTicketTitle,
@@ -198,7 +196,6 @@ function App() {
         createdAt: new Date().getTime()
       });
 
-      // 清空輸入框
       setNewTicketTitle('');
       setNewTicketMemo('');
       setNewTicketLink('');
