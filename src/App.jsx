@@ -43,6 +43,15 @@ function App() {
   const [editItiType, setEditItiType] = useState('📍');
   const [editItiMemo, setEditItiMemo] = useState('');
 
+  // ==========================================
+  // Firebase 資料：票夾 (修復白屏：補上缺失的 State)
+  // ==========================================
+  const [tickets, setTickets] = useState([]);
+  const [expandedCategory, setExpandedCategory] = useState(null);
+  const [newTicketTitle, setNewTicketTitle] = useState('');
+  const [newTicketMemo, setNewTicketMemo] = useState('');
+  const [newTicketLink, setNewTicketLink] = useState('');
+
   const dayDates = { 1: '7/18 (六)', 2: '7/19 (日)', 3: '7/20 (一)', 4: '7/21 (二)' };
 
   useEffect(() => {
@@ -61,10 +70,16 @@ function App() {
       setPackingList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
+    // 修復白屏：補上監聽 tickets 資料庫
+    const unsubTickets = onSnapshot(collection(db, 'tickets'), (snapshot) => {
+      setTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
     return () => {
       unsubItinerary();
       unsubExpenses();
       unsubPacking();
+      unsubTickets(); // 記得要清理監聽器
     };
   }, [isLoggedIn]);
 
@@ -325,7 +340,6 @@ function App() {
                 <form onSubmit={handleAddItinerary} className="bg-trip-card p-4 sm:p-5 rounded-2xl border border-trip-purple shadow-lg space-y-4 max-w-full overflow-hidden">
                   <h3 className="font-bold text-trip-purple-light mb-2">新增 Day {selectedDay} 的行程</h3>
                   
-                  {/* 優化 1：修正手機版超框問題，並在結束時間加上「清除」按鈕 */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex flex-col w-full">
                       <label className="block text-xs text-gray-400 mb-1">開始時間</label>
@@ -399,7 +413,6 @@ function App() {
                               >
                                 {editingItiId === item.id ? (
                                   <form onSubmit={handleUpdateItinerary} className="bg-trip-card p-4 rounded-xl border border-trip-purple shadow-lg space-y-3 max-w-full overflow-hidden">
-                                    {/* 優化 2：修正編輯狀態下的時間手機排版，並加上清除按鈕 */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                       <div className="w-full flex items-center gap-2">
                                         <span className="text-xs text-gray-500 whitespace-nowrap min-w-[28px]">開始</span>
