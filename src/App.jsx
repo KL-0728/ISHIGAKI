@@ -166,6 +166,41 @@ function App() {
   };
 
   // ------------------------------------------
+  // 🆕 快速票夾：純網址版上傳與刪除邏輯
+  // ------------------------------------------
+  const handleAddTicket = async (category, e) => {
+    e.preventDefault();
+    if (!newTicketTitle.trim()) return;
+
+    try {
+      await addDoc(collection(db, 'tickets'), {
+        category: category,
+        title: newTicketTitle,
+        memo: newTicketMemo,
+        link: newTicketLink,
+        createdAt: new Date().getTime()
+      });
+
+      setNewTicketTitle('');
+      setNewTicketMemo('');
+      setNewTicketLink('');
+    } catch (error) {
+      console.error(error);
+      alert("票券儲存失敗，請檢查網路連線！");
+    }
+  };
+
+  const handleDeleteTicket = async (id) => {
+    if (window.confirm('確定要刪除這張票券連結嗎？')) {
+      try {
+        await deleteDoc(doc(db, 'tickets', id));
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  };
+
+  // ------------------------------------------
   // 記帳功能
   // ------------------------------------------
   const handleAddExpense = async (e) => {
@@ -563,14 +598,100 @@ function App() {
           
           {activeTab === 'wallet' && (
             <div className="animate-fade-in space-y-8">
-              <section>
-                <h3 className="text-gray-400 text-sm font-bold mb-3 flex items-center gap-2"><span>🎫</span> 快速票夾</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-trip-card border border-gray-800 rounded-xl p-4 flex flex-col items-center justify-center text-center">
-                    <div className="w-12 h-12 bg-gray-800 rounded-lg mb-3 flex items-center justify-center text-2xl">📱</div>
-                    <p className="text-sm font-bold">Visit Japan</p>
-                  </div>
-                </div>
+              {/* 快速票夾手風琴區塊 (純網址版) */}
+              <section className="space-y-4 mb-6">
+                <h3 className="text-gray-400 text-sm font-bold mb-1 flex items-center gap-2"><span>🎫</span> 快速票夾 (點擊展開分類)</h3>
+                
+                {[
+                  { id: 'transport', name: '✈️ 機票與交通' },
+                  { id: 'activities', name: '🎢 樂園與活動' },
+                  { id: 'hotel', name: '🏨 住宿確認' }
+                ].map(cat => {
+                  const isExpanded = expandedCategory === cat.id;
+                  const catTickets = tickets.filter(t => t.category === cat.id);
+                  
+                  return (
+                    <div key={cat.id} className="bg-trip-card rounded-xl border border-gray-800 overflow-hidden shadow-sm">
+                      <button 
+                        type="button"
+                        onClick={() => setExpandedCategory(isExpanded ? null : cat.id)}
+                        className="w-full px-4 py-4 flex justify-between items-center font-bold hover:bg-gray-800/50 transition-colors text-left"
+                      >
+                        <span className="text-base flex items-center gap-2">
+                          {cat.name} 
+                          <span className="text-xs bg-trip-purple/20 text-trip-purple-light px-2 py-0.5 rounded-full font-medium">
+                            {catTickets.length}
+                          </span>
+                        </span>
+                        <span className="text-gray-500 text-xs transition-transform duration-200">{isExpanded ? '▲' : '▼'}</span>
+                      </button>
+                      
+                      {isExpanded && (
+                        <div className="p-4 bg-gray-950/40 border-t border-gray-800/80 space-y-4">
+                          
+                          {/* 新增連結小表單 */}
+                          <form onSubmit={(e) => handleAddTicket(cat.id, e)} className="bg-trip-bg p-4 rounded-xl border border-gray-800 space-y-3 shadow-inner">
+                            <p className="text-xs font-bold text-trip-purple-light">＋ 新增此分類票券或連結</p>
+                            <input 
+                              type="text" 
+                              placeholder="票券名稱 (例如: 樂桃航空去程機票)" 
+                              value={newTicketTitle} 
+                              onChange={(e) => setNewTicketTitle(e.target.value)} 
+                              className="w-full bg-trip-card px-3 py-2 text-sm rounded-lg border border-gray-700 focus:border-trip-purple outline-none text-white" 
+                              required 
+                            />
+                            <input 
+                              type="text" 
+                              placeholder="備註、說明或序號 (選填)" 
+                              value={newTicketMemo} 
+                              onChange={(e) => setNewTicketMemo(e.target.value)} 
+                              className="w-full bg-trip-card px-3 py-2 text-sm rounded-lg border border-gray-700 focus:border-trip-purple outline-none text-white" 
+                            />
+                            <input 
+                              type="url" 
+                              placeholder="貼上網址 (Google Drive、Klook訂單等)" 
+                              value={newTicketLink} 
+                              onChange={(e) => setNewTicketLink(e.target.value)} 
+                              className="w-full bg-trip-card px-3 py-2 text-sm rounded-lg border border-gray-700 focus:border-trip-purple outline-none text-white" 
+                            />
+                            <button type="submit" className="w-full bg-trip-purple hover:bg-trip-purple-dark text-white text-xs font-bold py-2 rounded-lg transition">
+                              確認儲存
+                            </button>
+                          </form>
+
+                          {/* 連結展示區 */}
+                          <div className="space-y-3">
+                            {catTickets.length === 0 ? (
+                              <p className="text-xs text-gray-500 text-center py-3">此分類尚無儲存的票券資料</p>
+                            ) : (
+                              catTickets.map(ticket => (
+                                <div key={ticket.id} className="bg-trip-bg p-3 rounded-xl border border-gray-800 space-y-2 relative shadow-sm">
+                                  <div className="pr-8">
+                                    <h4 className="font-bold text-sm text-white">{ticket.title}</h4>
+                                    {ticket.memo && <p className="text-xs text-gray-400 mt-1 whitespace-pre-line leading-relaxed">{ticket.memo}</p>}
+                                  </div>
+                                  <button type="button" onClick={() => handleDeleteTicket(ticket.id)} className="absolute top-2 right-2 text-gray-500 hover:text-red-400 text-xl font-bold p-1 transition">×</button>
+                                  
+                                  {/* 有網址的話就會出現跳轉按鈕 */}
+                                  {ticket.link && (
+                                    <a 
+                                      href={ticket.link} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="mt-2 inline-flex items-center gap-1 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white text-xs px-3 py-1.5 rounded transition"
+                                    >
+                                      <span>🔗</span> 開啟票券連結
+                                    </a>
+                                  )}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </section>
 
               <section>
